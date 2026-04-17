@@ -16,6 +16,8 @@ import {
   recordTabCount,
   exportToNotion,
   exportToTrello,
+  getContentSnippets,
+  setContentSnippet,
 } from '../storage/index';
 
 // ==================== Tab Monitoring ====================
@@ -28,6 +30,7 @@ function debounce(fn: () => void, delay: number) {
 }
 
 async function getAllTabs(): Promise<TabInfo[]> {
+  const snippets = await getContentSnippets();
   return new Promise((resolve) => {
     chrome.tabs.query({}, (tabs) => {
       const tabInfos: TabInfo[] = tabs.map(t => ({
@@ -38,6 +41,7 @@ async function getAllTabs(): Promise<TabInfo[]> {
         groupId: t.groupId,
         windowId: t.windowId,
         lastAccessed: t.lastAccessed,
+        contentSnippet: snippets[t.id!],
       }));
       resolve(tabInfos);
     });
@@ -148,7 +152,19 @@ chrome.runtime.onStartup.addListener(async () => {
 
 // ==================== Message Handling ====================
 
-chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
+  if (message.type === 'CONTENT_EXTRACTED') {
+    const p = (message.payload || {}) as { contentSnippet?: string };
+    if (sender.tab?.id && p.contentSnippet) {
+      setContentSnippet(sender.tab.id, p.contentSnippet).then(() => {
+        sendResponse({ received: true });
+      });
+    } else {
+      sendResponse({ received: true });
+    }
+    return true;
+  }
+
   handleMessage(message).then(sendResponse).catch((error) => {
     console.error('Message handler error:', error);
     sendResponse({ error: error.message });
@@ -250,8 +266,6 @@ async function handleMessage(message: ExtensionMessage) {
       const success = await exportToTrello(p, p.apiKey, p.token, p.boardId);
       return { success };
     }
-    case 'CONTENT_EXTRACTED':
-      return { received: true };
     default:
       return { error: 'Unknown message type' };
   }
