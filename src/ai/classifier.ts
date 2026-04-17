@@ -295,22 +295,22 @@ export function generateSuggestions(tabs: TabInfo[], groups: TabGroup[]): TabSug
       continue;
     }
 
-    // Old inactive tabs
-    if (timeSinceAccess > ONE_DAY) {
-      suggestions.push({
-        tabId: tab.id,
-        action: 'save',
-        reason: 'Not accessed in over 24 hours',
-      });
-      continue;
-    }
-
-    // Very old tabs
+    // Very old tabs (> 3 days)
     if (timeSinceAccess > 3 * ONE_DAY) {
       suggestions.push({
         tabId: tab.id,
         action: 'close',
         reason: 'Not accessed in over 3 days',
+      });
+      continue;
+    }
+
+    // Old inactive tabs (> 24 hours)
+    if (timeSinceAccess > ONE_DAY) {
+      suggestions.push({
+        tabId: tab.id,
+        action: 'save',
+        reason: 'Not accessed in over 24 hours',
       });
       continue;
     }

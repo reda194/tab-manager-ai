@@ -99,7 +99,6 @@
     chrome.runtime.sendMessage({
       type: 'CONTENT_EXTRACTED',
       payload: {
-        tabId: null, // Will be set by background
         contentSnippet: `${snippet.title} ${snippet.description} ${snippet.headings.slice(0, 3).join(' ')} ${snippet.mainContent.substring(0, 500)}`,
       },
     }).catch(() => {

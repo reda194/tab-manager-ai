@@ -114,6 +114,21 @@ export async function setCachedGroups(groups: TabGroup[]): Promise<void> {
   await setLocal(GROUPS_KEY, groups);
 }
 
+// ==================== Content Snippets ====================
+
+const SNIPPETS_KEY = 'tabManager_contentSnippets';
+
+export async function getContentSnippets(): Promise<Record<number, string>> {
+  const snippets = await getLocal<Record<number, string>>(SNIPPETS_KEY);
+  return snippets || {};
+}
+
+export async function setContentSnippet(tabId: number, snippet: string): Promise<void> {
+  const snippets = await getContentSnippets();
+  snippets[tabId] = snippet;
+  await setLocal(SNIPPETS_KEY, snippets);
+}
+
 // ==================== Tab Count ====================
 
 const TAB_COUNT_KEY = 'tabManager_tabCount';
