@@ -12,7 +12,13 @@ export interface MessageResponse {
 }
 
 export function sendMessage(type: MessageType, payload?: unknown): Promise<MessageResponse> {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type, payload }, resolve);
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ type, payload }, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(response);
+    });
   });
 }
