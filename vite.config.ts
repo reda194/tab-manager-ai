@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
-import { copyFileSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs';
+import { copyFileSync, mkdirSync, existsSync, readFileSync, writeFileSync, rmSync } from 'fs';
 
 export default defineConfig({
   base: '',
@@ -34,16 +34,21 @@ export default defineConfig({
           { src: 'src/sidepanel/sidepanel.html', dest: 'sidepanel.html' },
         ];
 
-          for (const f of htmlFiles) {
-            const srcPath = resolve(distDir, f.src);
-            const destPath = resolve(distDir, f.dest);
-            if (existsSync(srcPath)) {
-              let html = readFileSync(srcPath, 'utf-8');
-              // Fix all ../../ relative paths to ./ (since HTML moves to dist root)
-              html = html.replace(/\.\.\/\.\.\//g, './');
-              writeFileSync(destPath, html);
-            }
+        for (const f of htmlFiles) {
+          const srcPath = resolve(distDir, f.src);
+          const destPath = resolve(distDir, f.dest);
+          if (existsSync(srcPath)) {
+            let html = readFileSync(srcPath, 'utf-8');
+            html = html.replace(/\.\.\/\.\.\//g, './');
+            writeFileSync(destPath, html);
           }
+        }
+
+        // Clean up leftover nested dist/src directory
+        const nestedSrc = resolve(distDir, 'src');
+        if (existsSync(nestedSrc)) {
+          rmSync(nestedSrc, { recursive: true, force: true });
+        }
       },
     },
   ],
