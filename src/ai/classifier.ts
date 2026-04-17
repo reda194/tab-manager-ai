@@ -22,7 +22,7 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
   },
   {
     type: 'research',
-    keywords: ['research', 'paper', 'study', 'analysis', 'academic', 'arxiv', 'scholar', 'thesis', 'journal', 'study', 'learn', 'course', 'lecture', 'education', 'university'],
+    keywords: ['research', 'paper', 'study', 'analysis', 'academic', 'arxiv', 'scholar', 'thesis', 'journal', 'learn', 'course', 'lecture', 'education', 'university'],
     domains: ['scholar.google.com', 'arxiv.org', 'researchgate.net', 'academia.edu', 'coursera.org', 'udemy.com', 'edx.org', 'khanacademy.org', 'wikipedia.org'],
   },
   {
