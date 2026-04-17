@@ -81,9 +81,16 @@ export function Popup() {
 
   async function handleRefresh() {
     setLoading(true);
-    const result = await sendMessage('CLASSIFY_TABS');
-    if (result?.groups) setGroups(result.groups);
-    setLoading(false);
+    try {
+      const result = await sendMessage('CLASSIFY_TABS');
+      if (result?.groups) setGroups(result.groups);
+      const countRes = await sendMessage('GET_TAB_COUNT');
+      if (countRes?.count != null) { setTabCount(countRes.count); if (countRes.limit != null) setTabLimit(countRes.limit); }
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSaveSession() {
