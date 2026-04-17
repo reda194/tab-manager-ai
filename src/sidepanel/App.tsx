@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { TabGroup, Session, ExtensionSettings } from '../shared/types';
 import { GROUP_COLORS, GROUP_TYPE_LABELS, DEFAULT_SETTINGS } from '../shared/types';
 import { sendMessage } from '../shared/messaging';
@@ -126,11 +126,15 @@ function SessionsView({ sessions, onRestore, onDelete }: {
 
 function SettingsView({ settings, onSave }: { settings: ExtensionSettings; onSave: (s: Partial<ExtensionSettings>) => void }) {
   const [form, setForm] = useState<ExtensionSettings>(settings);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => { setForm(settings); }, [settings]);
 
   function updateField<K extends keyof ExtensionSettings>(key: K, value: ExtensionSettings[K]) {
     setForm(prev => ({ ...prev, [key]: value }));
-    onSave({ [key]: value });
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      onSave({ [key]: value });
+    }, 500);
   }
 
   return (
