@@ -1,12 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import type { TabGroup, Session, ExtensionSettings } from '../shared/types';
 import { GROUP_COLORS, GROUP_TYPE_LABELS, DEFAULT_SETTINGS } from '../shared/types';
-
-function sendMessage(type: string, payload?: unknown): Promise<any> {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type, payload }, resolve);
-  });
-}
+import { sendMessage } from '../shared/messaging';
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString('en-US', {
@@ -313,7 +308,7 @@ export function SidePanel() {
       if (groupsRes?.groups) setGroups(groupsRes.groups);
       if (sessionsRes?.sessions) setSessions(sessionsRes.sessions);
       if (settingsRes?.settings) setSettings(settingsRes.settings);
-      if (countRes) setTabCount(countRes.count);
+      if (countRes?.count != null) setTabCount(countRes.count);
     } catch (error) {
       console.error('Failed to load:', error);
     } finally {
@@ -328,7 +323,7 @@ export function SidePanel() {
     const result = await sendMessage('CLASSIFY_TABS');
     if (result?.groups) setGroups(result.groups);
     const countRes = await sendMessage('GET_TAB_COUNT');
-    if (countRes) setTabCount(countRes.count);
+    if (countRes?.count != null) setTabCount(countRes.count);
     setLoading(false);
   }
 

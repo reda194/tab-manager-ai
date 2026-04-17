@@ -16,18 +16,24 @@ import {
   recordTabCount,
   exportToNotion,
   exportToTrello,
+  getContentSnippets,
+  setContentSnippet,
 } from '../storage/index';
 
 // ==================== Tab Monitoring ====================
 
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
-function debounce(fn: () => void, delay: number) {
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(fn, delay);
+function debounce(key: string, fn: () => void, delay: number) {
+  if (debounceTimers[key]) clearTimeout(debounceTimers[key]);
+  debounceTimers[key] = setTimeout(() => {
+    delete debounceTimers[key];
+    fn();
+  }, delay);
 }
 
 async function getAllTabs(): Promise<TabInfo[]> {
+  const snippets = await getContentSnippets();
   return new Promise((resolve) => {
     chrome.tabs.query({}, (tabs) => {
       const tabInfos: TabInfo[] = tabs.map(t => ({
@@ -38,6 +44,7 @@ async function getAllTabs(): Promise<TabInfo[]> {
         groupId: t.groupId,
         windowId: t.windowId,
         lastAccessed: t.lastAccessed,
+        contentSnippet: snippets[t.id!],
       }));
       resolve(tabInfos);
     });
@@ -83,7 +90,7 @@ async function classifyAndCache() {
 // ==================== Event Listeners ====================
 
 chrome.tabs.onCreated.addListener((tab) => {
-  debounce(() => {
+  debounce('created', () => {
     classifyAndCache();
     logActivity({
       id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -95,7 +102,7 @@ chrome.tabs.onCreated.addListener((tab) => {
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-  debounce(() => {
+  debounce('removed', () => {
     classifyAndCache();
     logActivity({
       id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -108,12 +115,12 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
   if (changeInfo.title || changeInfo.url) {
-    debounce(() => classifyAndCache(), 2000);
+    debounce('updated', () => classifyAndCache(), 2000);
   }
 });
 
 chrome.tabs.onActivated.addListener(() => {
-  debounce(() => classifyAndCache(), 1500);
+  debounce('activated', () => classifyAndCache(), 1500);
 });
 
 // ==================== Alarm for Periodic Classification ====================
@@ -148,7 +155,19 @@ chrome.runtime.onStartup.addListener(async () => {
 
 // ==================== Message Handling ====================
 
-chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
+  if (message.type === 'CONTENT_EXTRACTED') {
+    const p = (message.payload || {}) as { contentSnippet?: string };
+    if (sender.tab?.id && p.contentSnippet) {
+      setContentSnippet(sender.tab.id, p.contentSnippet).then(() => {
+        sendResponse({ received: true });
+      });
+    } else {
+      sendResponse({ received: true });
+    }
+    return true;
+  }
+
   handleMessage(message).then(sendResponse).catch((error) => {
     console.error('Message handler error:', error);
     sendResponse({ error: error.message });
@@ -208,7 +227,10 @@ async function handleMessage(message: ExtensionMessage) {
       if (session) {
         for (const group of session.groups) {
           for (const tab of group.tabs) {
-            if (tab.url) chrome.tabs.create({ url: tab.url, active: false });
+            if (tab.url) {
+              chrome.tabs.create({ url: tab.url, active: false });
+              await new Promise(r => setTimeout(r, 100));
+            }
           }
         }
         await logActivity({
@@ -237,7 +259,7 @@ async function handleMessage(message: ExtensionMessage) {
     }
     case 'UPDATE_SETTINGS': {
       const partial = (message.payload || {}) as Partial<ExtensionSettings>;
-        const updated = await updateSettingsFn(partial);
+      const updated = await updateSettingsFn(partial);
       return { success: true, settings: updated };
     }
     case 'EXPORT_TO_NOTION': {
@@ -250,8 +272,6 @@ async function handleMessage(message: ExtensionMessage) {
       const success = await exportToTrello(p, p.apiKey, p.token, p.boardId);
       return { success };
     }
-    case 'CONTENT_EXTRACTED':
-      return { received: true };
     default:
       return { error: 'Unknown message type' };
   }

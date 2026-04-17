@@ -1,12 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import type { TabGroup } from '../shared/types';
 import { GROUP_COLORS, GROUP_TYPE_LABELS } from '../shared/types';
-
-function sendMessage(type: string, payload?: unknown): Promise<any> {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type, payload }, resolve);
-  });
-}
+import { sendMessage } from '../shared/messaging';
 
 function GroupCard({ group, onCloseGroup }: { group: TabGroup; onCloseGroup: (ids: number[]) => void }) {
   const [expanded, setExpanded] = useState(false);
@@ -74,7 +69,7 @@ export function Popup() {
     try {
       const [groupsRes, countRes] = await Promise.all([sendMessage('GET_TAB_GROUPS'), sendMessage('GET_TAB_COUNT')]);
       if (groupsRes?.groups) setGroups(groupsRes.groups);
-      if (countRes) { setTabCount(countRes.count); setTabLimit(countRes.limit); }
+      if (countRes?.count != null) { setTabCount(countRes.count); if (countRes.limit != null) setTabLimit(countRes.limit); }
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
