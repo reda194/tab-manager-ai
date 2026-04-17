@@ -162,6 +162,19 @@ export async function setContentSnippet(tabId: number, snippet: string): Promise
   await setLocal(SNIPPETS_KEY, snippets);
 }
 
+export async function evictStaleSnippets(activeTabIds: number[]): Promise<void> {
+  const snippets = await getContentSnippets();
+  const activeSet = new Set(activeTabIds);
+  let changed = false;
+  for (const id of Object.keys(snippets)) {
+    if (!activeSet.has(Number(id))) {
+      delete snippets[Number(id)];
+      changed = true;
+    }
+  }
+  if (changed) await setLocal(SNIPPETS_KEY, snippets);
+}
+
 // ==================== Tab Count ====================
 
 const TAB_COUNT_KEY = 'tabManager_tabCount';

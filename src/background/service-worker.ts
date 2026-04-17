@@ -19,6 +19,7 @@ import {
   getContentSnippets,
   setContentSnippet,
   getLocal,
+  evictStaleSnippets,
 } from '../storage/index';
 
 // ==================== Tab Monitoring ====================
@@ -76,6 +77,7 @@ async function classifyAndCache() {
 
     await setCachedGroups(result.groups);
     await saveCurrentState(result.groups);
+    await evictStaleSnippets(tabs.map(t => t.id));
 
     const text = tabs.length > 0 ? String(tabs.length) : '';
     chrome.action.setBadgeText({ text });
