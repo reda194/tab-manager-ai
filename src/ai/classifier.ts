@@ -53,7 +53,7 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
   {
     type: 'work',
     keywords: ['jira', 'trello', 'asana', 'monday', 'clickup', 'project', 'task', 'sprint', 'kanban', 'board', 'backlog', 'milestone', 'client', 'invoice', 'proposal', 'contract'],
-    domains: ['trello.com', 'jira.atlassian.com', 'asana.com', 'monday.com', 'clickup.com', 'notion.so', 'linear.app', 'basecamp.com'],
+    domains: ['trello.com', 'jira.atlassian.com', 'asana.com', 'monday.com', 'clickup.com', 'linear.app', 'basecamp.com'],
   },
 ];
 
