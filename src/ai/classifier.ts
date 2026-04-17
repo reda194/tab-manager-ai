@@ -270,7 +270,7 @@ export interface TabSuggestion {
   reason: string;
 }
 
-export function generateSuggestions(tabs: TabInfo[], groups: TabGroup[]): TabSuggestion[] {
+export function generateSuggestions(tabs: TabInfo[]): TabSuggestion[] {
   const suggestions: TabSuggestion[] = [];
   const now = Date.now();
   const ONE_HOUR = 60 * 60 * 1000;
