@@ -227,7 +227,10 @@ async function handleMessage(message: ExtensionMessage) {
       if (session) {
         for (const group of session.groups) {
           for (const tab of group.tabs) {
-            if (tab.url) chrome.tabs.create({ url: tab.url, active: false });
+            if (tab.url) {
+              chrome.tabs.create({ url: tab.url, active: false });
+              await new Promise(r => setTimeout(r, 100));
+            }
           }
         }
         await logActivity({
@@ -256,7 +259,7 @@ async function handleMessage(message: ExtensionMessage) {
     }
     case 'UPDATE_SETTINGS': {
       const partial = (message.payload || {}) as Partial<ExtensionSettings>;
-        const updated = await updateSettingsFn(partial);
+      const updated = await updateSettingsFn(partial);
       return { success: true, settings: updated };
     }
     case 'EXPORT_TO_NOTION': {
