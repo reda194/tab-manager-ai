@@ -11,6 +11,8 @@ async function getLocal<T>(key: string): Promise<T | null> {
   });
 }
 
+export { getLocal };
+
 async function setLocal<T>(key: string, value: T): Promise<void> {
   return new Promise((resolve) => {
     chrome.storage.local.set({ [key]: value }, resolve);

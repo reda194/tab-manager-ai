@@ -18,6 +18,7 @@ import {
   exportToTrello,
   getContentSnippets,
   setContentSnippet,
+  getLocal,
 } from '../storage/index';
 
 // ==================== Tab Monitoring ====================
@@ -138,7 +139,7 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() =>
 // ==================== "What were you doing?" on startup ====================
 
 chrome.runtime.onStartup.addListener(async () => {
-  const lastSession = await getLocal('tabManager_lastSession') as { groups: TabGroup[]; savedAt: number } | null;
+  const lastSession = await getLocal<{ groups: TabGroup[]; savedAt: number }>('tabManager_lastSession');
   if (lastSession && lastSession.groups.length > 0) {
     const timeAgo = formatTimeAgo(lastSession.savedAt);
     const totalTabs = lastSession.groups.reduce((acc, g) => acc + g.tabs.length, 0);
@@ -278,14 +279,6 @@ async function handleMessage(message: ExtensionMessage) {
 }
 
 // ==================== Helpers ====================
-
-function getLocal(key: string): Promise<unknown> {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(key, (result) => {
-      resolve(result[key] ?? null);
-    });
-  });
-}
 
 function formatTimeAgo(timestamp: number): string {
   const diff = Date.now() - timestamp;
