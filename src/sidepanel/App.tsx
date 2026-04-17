@@ -320,11 +320,16 @@ export function SidePanel() {
 
   async function handleRefresh() {
     setLoading(true);
-    const result = await sendMessage('CLASSIFY_TABS');
-    if (result?.groups) setGroups(result.groups);
-    const countRes = await sendMessage('GET_TAB_COUNT');
-    if (countRes?.count != null) setTabCount(countRes.count);
-    setLoading(false);
+    try {
+      const result = await sendMessage('CLASSIFY_TABS');
+      if (result?.groups) setGroups(result.groups);
+      const countRes = await sendMessage('GET_TAB_COUNT');
+      if (countRes?.count != null) setTabCount(countRes.count);
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSaveSession() {
