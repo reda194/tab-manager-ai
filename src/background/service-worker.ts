@@ -300,5 +300,9 @@ function formatTimeAgo(timestamp: number): string {
 
 // ==================== Initialize ====================
 
-chrome.runtime.onInstalled.addListener(() => classifyAndCache());
-classifyAndCache();
+let installed = false;
+chrome.runtime.onInstalled.addListener(() => {
+  installed = true;
+  classifyAndCache();
+});
+if (!installed) classifyAndCache();
