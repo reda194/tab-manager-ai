@@ -27,6 +27,10 @@ import {
 const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 let lastTabHash: string | null = null;
 
+function activityId(): string {
+  return `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
 function computeTabHash(tabs: TabInfo[]): string {
   const ids = tabs.map(t => `${t.id}:${t.url}:${t.title}`).sort().join('|');
   let hash = 0;
@@ -112,7 +116,7 @@ chrome.tabs.onCreated.addListener((tab) => {
   debounce('created', () => {
     classifyAndCache();
     logActivity({
-      id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: activityId(),
       action: 'opened',
       description: `Opened: ${tab.title || tab.url || 'New Tab'}`,
       timestamp: Date.now(),
@@ -124,7 +128,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   debounce('removed', () => {
     classifyAndCache();
     logActivity({
-      id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: activityId(),
       action: 'closed',
       description: `Closed tab #${tabId}`,
       timestamp: Date.now(),
@@ -223,7 +227,7 @@ async function handleMessage(message: ExtensionMessage) {
       };
       await saveSession(session);
       await logActivity({
-        id: `act-${Date.now()}`,
+        id: activityId(),
         action: 'saved',
         description: `Saved session: ${session.name}`,
         timestamp: Date.now(),
@@ -253,7 +257,7 @@ async function handleMessage(message: ExtensionMessage) {
           }
         }
         await logActivity({
-          id: `act-${Date.now()}`,
+          id: activityId(),
           action: 'restored',
           description: `Restored session: ${session.name}`,
           timestamp: Date.now(),
