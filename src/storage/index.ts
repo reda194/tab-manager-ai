@@ -240,9 +240,12 @@ export async function exportToTrello(
   boardId: string
 ): Promise<boolean> {
   try {
-    // First, get the first list from the board
     const listsResponse = await fetch(
-      `https://api.trello.com/1/boards/${boardId}/lists?key=${apiKey}&token=${token}`
+      `https://api.trello.com/1/boards/${boardId}/lists`,
+      {
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: apiKey, token }),
+      }
     );
 
     if (!listsResponse.ok) return false;
@@ -252,7 +255,6 @@ export async function exportToTrello(
 
     const listId = lists[0].id;
 
-    // Create a card
     const response = await fetch('https://api.trello.com/1/cards', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
