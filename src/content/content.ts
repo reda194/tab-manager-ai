@@ -93,16 +93,20 @@
     }
   );
 
-  // Auto-send content snippet to background on load
+  // Auto-send content snippet to background on load (only if user enabled AI)
   try {
-    const snippet = extractPageContent();
-    chrome.runtime.sendMessage({
-      type: 'CONTENT_EXTRACTED',
-      payload: {
-        contentSnippet: `${snippet.title} ${snippet.description} ${snippet.headings.slice(0, 3).join(' ')} ${snippet.mainContent.substring(0, 500)}`,
-      },
-    }).catch(() => {
-      // Background not ready, ignore
+    chrome.storage.sync.get('tabManager_settings', (result) => {
+      const settings = result.tabManager_settings;
+      const contentExtractionEnabled = settings && (settings.enableAI || settings.autoGroup);
+      if (!contentExtractionEnabled) return;
+
+      const snippet = extractPageContent();
+      chrome.runtime.sendMessage({
+        type: 'CONTENT_EXTRACTED',
+        payload: {
+          contentSnippet: `${snippet.title} ${snippet.description} ${snippet.headings.slice(0, 3).join(' ')} ${snippet.mainContent.substring(0, 500)}`,
+        },
+      }).catch(() => {});
     });
   } catch {
     // Ignore errors
