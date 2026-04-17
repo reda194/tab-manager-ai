@@ -347,7 +347,7 @@ export function SidePanel() {
 
   async function handleRestoreSession(id: string) {
     await sendMessage('RESTORE_SESSION', { sessionId: id });
-    handleRefresh();
+    setTimeout(() => handleRefresh(), 2000);
   }
 
   async function handleDeleteSession(id: string) {
