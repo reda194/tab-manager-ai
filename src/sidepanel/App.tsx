@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { TabGroup, Session, ExtensionSettings } from '../shared/types';
 import { GROUP_COLORS, GROUP_TYPE_LABELS, DEFAULT_SETTINGS } from '../shared/types';
 import { sendMessage } from '../shared/messaging';
@@ -126,11 +126,15 @@ function SessionsView({ sessions, onRestore, onDelete }: {
 
 function SettingsView({ settings, onSave }: { settings: ExtensionSettings; onSave: (s: Partial<ExtensionSettings>) => void }) {
   const [form, setForm] = useState<ExtensionSettings>(settings);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => { setForm(settings); }, [settings]);
 
   function updateField<K extends keyof ExtensionSettings>(key: K, value: ExtensionSettings[K]) {
     setForm(prev => ({ ...prev, [key]: value }));
-    onSave({ [key]: value });
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      onSave({ [key]: value });
+    }, 500);
   }
 
   return (
@@ -320,11 +324,16 @@ export function SidePanel() {
 
   async function handleRefresh() {
     setLoading(true);
-    const result = await sendMessage('CLASSIFY_TABS');
-    if (result?.groups) setGroups(result.groups);
-    const countRes = await sendMessage('GET_TAB_COUNT');
-    if (countRes?.count != null) setTabCount(countRes.count);
-    setLoading(false);
+    try {
+      const result = await sendMessage('CLASSIFY_TABS');
+      if (result?.groups) setGroups(result.groups);
+      const countRes = await sendMessage('GET_TAB_COUNT');
+      if (countRes?.count != null) setTabCount(countRes.count);
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSaveSession() {
@@ -338,7 +347,7 @@ export function SidePanel() {
 
   async function handleRestoreSession(id: string) {
     await sendMessage('RESTORE_SESSION', { sessionId: id });
-    handleRefresh();
+    setTimeout(() => handleRefresh(), 2000);
   }
 
   async function handleDeleteSession(id: string) {

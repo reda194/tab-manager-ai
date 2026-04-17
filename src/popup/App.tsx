@@ -81,9 +81,16 @@ export function Popup() {
 
   async function handleRefresh() {
     setLoading(true);
-    const result = await sendMessage('CLASSIFY_TABS');
-    if (result?.groups) setGroups(result.groups);
-    setLoading(false);
+    try {
+      const result = await sendMessage('CLASSIFY_TABS');
+      if (result?.groups) setGroups(result.groups);
+      const countRes = await sendMessage('GET_TAB_COUNT');
+      if (countRes?.count != null) { setTabCount(countRes.count); if (countRes.limit != null) setTabLimit(countRes.limit); }
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleSaveSession() {
@@ -171,7 +178,7 @@ export function Popup() {
               </>
             )}
           </button>
-          <button onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL('sidepanel.html') })}
+          <button onClick={() => chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT })}
             className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-medium rounded-lg transition-colors">
             Full View
           </button>

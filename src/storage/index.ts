@@ -11,6 +11,8 @@ async function getLocal<T>(key: string): Promise<T | null> {
   });
 }
 
+export { getLocal };
+
 async function setLocal<T>(key: string, value: T): Promise<void> {
   return new Promise((resolve) => {
     chrome.storage.local.set({ [key]: value }, resolve);
@@ -34,16 +36,47 @@ async function setSync<T>(key: string, value: T): Promise<void> {
 // ==================== Settings ====================
 
 const SETTINGS_KEY = 'tabManager_settings';
+const SECURE_KEYS = new Set<keyof ExtensionSettings>([
+  'anthropicApiKey',
+  'notionApiKey',
+  'notionDatabaseId',
+  'trelloApiKey',
+  'trelloToken',
+  'trelloBoardId',
+]);
 
 export async function getSettings(): Promise<ExtensionSettings> {
-  const settings = await getSync<ExtensionSettings>(SETTINGS_KEY);
-  return settings ? { ...DEFAULT_SETTINGS, ...settings } : { ...DEFAULT_SETTINGS };
+  const [syncSettings, localSettings] = await Promise.all([
+    getSync<ExtensionSettings>(SETTINGS_KEY),
+    getLocal<ExtensionSettings>(SETTINGS_KEY),
+  ]);
+  const base = { ...DEFAULT_SETTINGS, ...syncSettings, ...localSettings };
+  return base;
 }
 
 export async function updateSettings(partial: Partial<ExtensionSettings>): Promise<ExtensionSettings> {
   const current = await getSettings();
   const updated = { ...current, ...partial };
-  await setSync(SETTINGS_KEY, updated);
+
+  const syncPart: Record<string, unknown> = {};
+  const localPart: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(partial)) {
+    if (SECURE_KEYS.has(key as keyof ExtensionSettings)) {
+      localPart[key] = value;
+    } else {
+      syncPart[key] = value;
+    }
+  }
+
+  if (Object.keys(localPart).length > 0) {
+    const existingLocal = await getLocal<Record<string, unknown>>(SETTINGS_KEY) || {};
+    await setLocal(SETTINGS_KEY, { ...existingLocal, ...localPart });
+  }
+  if (Object.keys(syncPart).length > 0) {
+    const existingSync = await getSync<Record<string, unknown>>(SETTINGS_KEY) || {};
+    await setSync(SETTINGS_KEY, { ...existingSync, ...syncPart });
+  }
+
   return updated;
 }
 
@@ -129,6 +162,19 @@ export async function setContentSnippet(tabId: number, snippet: string): Promise
   await setLocal(SNIPPETS_KEY, snippets);
 }
 
+export async function evictStaleSnippets(activeTabIds: number[]): Promise<void> {
+  const snippets = await getContentSnippets();
+  const activeSet = new Set(activeTabIds);
+  let changed = false;
+  for (const id of Object.keys(snippets)) {
+    if (!activeSet.has(Number(id))) {
+      delete snippets[Number(id)];
+      changed = true;
+    }
+  }
+  if (changed) await setLocal(SNIPPETS_KEY, snippets);
+}
+
 // ==================== Tab Count ====================
 
 const TAB_COUNT_KEY = 'tabManager_tabCount';
@@ -207,9 +253,12 @@ export async function exportToTrello(
   boardId: string
 ): Promise<boolean> {
   try {
-    // First, get the first list from the board
     const listsResponse = await fetch(
-      `https://api.trello.com/1/boards/${boardId}/lists?key=${apiKey}&token=${token}`
+      `https://api.trello.com/1/boards/${boardId}/lists`,
+      {
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: apiKey, token }),
+      }
     );
 
     if (!listsResponse.ok) return false;
@@ -219,7 +268,6 @@ export async function exportToTrello(
 
     const listId = lists[0].id;
 
-    // Create a card
     const response = await fetch('https://api.trello.com/1/cards', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

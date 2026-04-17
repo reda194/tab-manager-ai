@@ -22,7 +22,7 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
   },
   {
     type: 'research',
-    keywords: ['research', 'paper', 'study', 'analysis', 'academic', 'arxiv', 'scholar', 'thesis', 'journal', 'study', 'learn', 'course', 'lecture', 'education', 'university'],
+    keywords: ['research', 'paper', 'study', 'analysis', 'academic', 'arxiv', 'scholar', 'thesis', 'journal', 'learn', 'course', 'lecture', 'education', 'university'],
     domains: ['scholar.google.com', 'arxiv.org', 'researchgate.net', 'academia.edu', 'coursera.org', 'udemy.com', 'edx.org', 'khanacademy.org', 'wikipedia.org'],
   },
   {
@@ -53,7 +53,7 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
   {
     type: 'work',
     keywords: ['jira', 'trello', 'asana', 'monday', 'clickup', 'project', 'task', 'sprint', 'kanban', 'board', 'backlog', 'milestone', 'client', 'invoice', 'proposal', 'contract'],
-    domains: ['trello.com', 'jira.atlassian.com', 'asana.com', 'monday.com', 'clickup.com', 'notion.so', 'linear.app', 'basecamp.com'],
+    domains: ['trello.com', 'jira.atlassian.com', 'asana.com', 'monday.com', 'clickup.com', 'linear.app', 'basecamp.com'],
   },
 ];
 
@@ -120,14 +120,19 @@ async function classifyWithAI(
 
   if (!apiKey || tabs.length === 0) return results;
 
-  const tabSummaries = tabs.map(t => ({
-    id: t.id,
-    title: t.title,
-    url: t.url,
-    snippet: (t.contentSnippet || '').substring(0, 200),
-  }));
+  const BATCH_SIZE = 20;
 
-  const prompt = `Classify these browser tabs into groups. For each tab, provide:
+  for (let i = 0; i < tabs.length; i += BATCH_SIZE) {
+    const batch = tabs.slice(i, i + BATCH_SIZE);
+
+    const tabSummaries = batch.map(t => ({
+      id: t.id,
+      title: t.title,
+      url: t.url,
+      snippet: (t.contentSnippet || '').substring(0, 200),
+    }));
+
+    const prompt = `Classify these browser tabs into groups. For each tab, provide:
 - type: one of [work, research, shopping, social, entertainment, news, development, documentation, communication, other]
 - groupName: a short descriptive name for the group (max 3 words)
 - confidence: 0.0 to 1.0
@@ -137,44 +142,45 @@ Respond ONLY with a JSON array of objects with id, type, groupName, confidence.
 Tabs to classify:
 ${JSON.stringify(tabSummaries, null, 2)}`;
 
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-haiku-latest',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-haiku-latest',
+          max_tokens: 2000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
 
-    if (!response.ok) {
-      console.error('AI classification failed:', response.status);
+      if (!response.ok) {
+        console.error('AI classification failed:', response.status);
+        return results;
+      }
+
+      const data = await response.json();
+      const content = data.content?.[0]?.text || '';
+
+      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        for (const item of parsed) {
+          results.set(item.id, {
+            type: item.type || 'other',
+            groupName: item.groupName || 'Uncategorized',
+            confidence: item.confidence || 0.5,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('AI classification error:', error);
       return results;
     }
-
-    const data = await response.json();
-    const content = data.content?.[0]?.text || '';
-    
-    // Extract JSON from response
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      for (const item of parsed) {
-        results.set(item.id, {
-          type: item.type || 'other',
-          groupName: item.groupName || 'Uncategorized',
-          confidence: item.confidence || 0.5,
-        });
-      }
-    }
-  } catch (error) {
-    console.error('AI classification error:', error);
   }
 
   return results;
@@ -270,7 +276,7 @@ export interface TabSuggestion {
   reason: string;
 }
 
-export function generateSuggestions(tabs: TabInfo[], groups: TabGroup[]): TabSuggestion[] {
+export function generateSuggestions(tabs: TabInfo[]): TabSuggestion[] {
   const suggestions: TabSuggestion[] = [];
   const now = Date.now();
   const ONE_HOUR = 60 * 60 * 1000;

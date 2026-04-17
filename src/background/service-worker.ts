@@ -18,11 +18,27 @@ import {
   exportToTrello,
   getContentSnippets,
   setContentSnippet,
+  getLocal,
+  evictStaleSnippets,
 } from '../storage/index';
 
 // ==================== Tab Monitoring ====================
 
 const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+let lastTabHash: string | null = null;
+
+function activityId(): string {
+  return `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function computeTabHash(tabs: TabInfo[]): string {
+  const ids = tabs.map(t => `${t.id}:${t.url}:${t.title}`).sort().join('|');
+  let hash = 0;
+  for (let i = 0; i < ids.length; i++) {
+    hash = ((hash << 5) - hash + ids.charCodeAt(i)) | 0;
+  }
+  return String(hash);
+}
 
 function debounce(key: string, fn: () => void, delay: number) {
   if (debounceTimers[key]) clearTimeout(debounceTimers[key]);
@@ -58,6 +74,12 @@ async function classifyAndCache() {
 
     await recordTabCount(tabs.length);
 
+    const currentHash = computeTabHash(tabs);
+    if (currentHash === lastTabHash) {
+      return await getCachedGroups();
+    }
+    lastTabHash = currentHash;
+
     if (settings.enableNotifications && tabs.length >= settings.tabLimit) {
       chrome.notifications.create('tab-limit-warning', {
         type: 'basic',
@@ -75,6 +97,7 @@ async function classifyAndCache() {
 
     await setCachedGroups(result.groups);
     await saveCurrentState(result.groups);
+    await evictStaleSnippets(tabs.map(t => t.id));
 
     const text = tabs.length > 0 ? String(tabs.length) : '';
     chrome.action.setBadgeText({ text });
@@ -93,7 +116,7 @@ chrome.tabs.onCreated.addListener((tab) => {
   debounce('created', () => {
     classifyAndCache();
     logActivity({
-      id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: activityId(),
       action: 'opened',
       description: `Opened: ${tab.title || tab.url || 'New Tab'}`,
       timestamp: Date.now(),
@@ -105,7 +128,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   debounce('removed', () => {
     classifyAndCache();
     logActivity({
-      id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: activityId(),
       action: 'closed',
       description: `Closed tab #${tabId}`,
       timestamp: Date.now(),
@@ -138,7 +161,7 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() =>
 // ==================== "What were you doing?" on startup ====================
 
 chrome.runtime.onStartup.addListener(async () => {
-  const lastSession = await getLocal('tabManager_lastSession') as { groups: TabGroup[]; savedAt: number } | null;
+  const lastSession = await getLocal<{ groups: TabGroup[]; savedAt: number }>('tabManager_lastSession');
   if (lastSession && lastSession.groups.length > 0) {
     const timeAgo = formatTimeAgo(lastSession.savedAt);
     const totalTabs = lastSession.groups.reduce((acc, g) => acc + g.tabs.length, 0);
@@ -204,7 +227,7 @@ async function handleMessage(message: ExtensionMessage) {
       };
       await saveSession(session);
       await logActivity({
-        id: `act-${Date.now()}`,
+        id: activityId(),
         action: 'saved',
         description: `Saved session: ${session.name}`,
         timestamp: Date.now(),
@@ -234,7 +257,7 @@ async function handleMessage(message: ExtensionMessage) {
           }
         }
         await logActivity({
-          id: `act-${Date.now()}`,
+          id: activityId(),
           action: 'restored',
           description: `Restored session: ${session.name}`,
           timestamp: Date.now(),
@@ -279,14 +302,6 @@ async function handleMessage(message: ExtensionMessage) {
 
 // ==================== Helpers ====================
 
-function getLocal(key: string): Promise<unknown> {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(key, (result) => {
-      resolve(result[key] ?? null);
-    });
-  });
-}
-
 function formatTimeAgo(timestamp: number): string {
   const diff = Date.now() - timestamp;
   const minutes = Math.floor(diff / 60000);
@@ -300,5 +315,9 @@ function formatTimeAgo(timestamp: number): string {
 
 // ==================== Initialize ====================
 
-chrome.runtime.onInstalled.addListener(() => classifyAndCache());
-classifyAndCache();
+let installed = false;
+chrome.runtime.onInstalled.addListener(() => {
+  installed = true;
+  classifyAndCache();
+});
+if (!installed) classifyAndCache();
