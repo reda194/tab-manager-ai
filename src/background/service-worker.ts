@@ -25,6 +25,16 @@ import {
 // ==================== Tab Monitoring ====================
 
 const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+let lastTabHash: string | null = null;
+
+function computeTabHash(tabs: TabInfo[]): string {
+  const ids = tabs.map(t => `${t.id}:${t.url}:${t.title}`).sort().join('|');
+  let hash = 0;
+  for (let i = 0; i < ids.length; i++) {
+    hash = ((hash << 5) - hash + ids.charCodeAt(i)) | 0;
+  }
+  return String(hash);
+}
 
 function debounce(key: string, fn: () => void, delay: number) {
   if (debounceTimers[key]) clearTimeout(debounceTimers[key]);
@@ -59,6 +69,12 @@ async function classifyAndCache() {
     const settings = await getSettings();
 
     await recordTabCount(tabs.length);
+
+    const currentHash = computeTabHash(tabs);
+    if (currentHash === lastTabHash) {
+      return await getCachedGroups();
+    }
+    lastTabHash = currentHash;
 
     if (settings.enableNotifications && tabs.length >= settings.tabLimit) {
       chrome.notifications.create('tab-limit-warning', {
