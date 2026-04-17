@@ -36,16 +36,47 @@ async function setSync<T>(key: string, value: T): Promise<void> {
 // ==================== Settings ====================
 
 const SETTINGS_KEY = 'tabManager_settings';
+const SECURE_KEYS = new Set<keyof ExtensionSettings>([
+  'anthropicApiKey',
+  'notionApiKey',
+  'notionDatabaseId',
+  'trelloApiKey',
+  'trelloToken',
+  'trelloBoardId',
+]);
 
 export async function getSettings(): Promise<ExtensionSettings> {
-  const settings = await getSync<ExtensionSettings>(SETTINGS_KEY);
-  return settings ? { ...DEFAULT_SETTINGS, ...settings } : { ...DEFAULT_SETTINGS };
+  const [syncSettings, localSettings] = await Promise.all([
+    getSync<ExtensionSettings>(SETTINGS_KEY),
+    getLocal<ExtensionSettings>(SETTINGS_KEY),
+  ]);
+  const base = { ...DEFAULT_SETTINGS, ...syncSettings, ...localSettings };
+  return base;
 }
 
 export async function updateSettings(partial: Partial<ExtensionSettings>): Promise<ExtensionSettings> {
   const current = await getSettings();
   const updated = { ...current, ...partial };
-  await setSync(SETTINGS_KEY, updated);
+
+  const syncPart: Record<string, unknown> = {};
+  const localPart: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(partial)) {
+    if (SECURE_KEYS.has(key as keyof ExtensionSettings)) {
+      localPart[key] = value;
+    } else {
+      syncPart[key] = value;
+    }
+  }
+
+  if (Object.keys(localPart).length > 0) {
+    const existingLocal = await getLocal<Record<string, unknown>>(SETTINGS_KEY) || {};
+    await setLocal(SETTINGS_KEY, { ...existingLocal, ...localPart });
+  }
+  if (Object.keys(syncPart).length > 0) {
+    const existingSync = await getSync<Record<string, unknown>>(SETTINGS_KEY) || {};
+    await setSync(SETTINGS_KEY, { ...existingSync, ...syncPart });
+  }
+
   return updated;
 }
 
