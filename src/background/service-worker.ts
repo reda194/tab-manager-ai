@@ -22,11 +22,14 @@ import {
 
 // ==================== Tab Monitoring ====================
 
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
-function debounce(fn: () => void, delay: number) {
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(fn, delay);
+function debounce(key: string, fn: () => void, delay: number) {
+  if (debounceTimers[key]) clearTimeout(debounceTimers[key]);
+  debounceTimers[key] = setTimeout(() => {
+    delete debounceTimers[key];
+    fn();
+  }, delay);
 }
 
 async function getAllTabs(): Promise<TabInfo[]> {
@@ -87,7 +90,7 @@ async function classifyAndCache() {
 // ==================== Event Listeners ====================
 
 chrome.tabs.onCreated.addListener((tab) => {
-  debounce(() => {
+  debounce('created', () => {
     classifyAndCache();
     logActivity({
       id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -99,7 +102,7 @@ chrome.tabs.onCreated.addListener((tab) => {
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-  debounce(() => {
+  debounce('removed', () => {
     classifyAndCache();
     logActivity({
       id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -112,12 +115,12 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
   if (changeInfo.title || changeInfo.url) {
-    debounce(() => classifyAndCache(), 2000);
+    debounce('updated', () => classifyAndCache(), 2000);
   }
 });
 
 chrome.tabs.onActivated.addListener(() => {
-  debounce(() => classifyAndCache(), 1500);
+  debounce('activated', () => classifyAndCache(), 1500);
 });
 
 // ==================== Alarm for Periodic Classification ====================
